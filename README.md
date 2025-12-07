@@ -11,9 +11,9 @@ The ICSI Chatbot processes Meeting Room Transcript (MRT) files from the ICSI cor
 - 📝 Context-aware chunking optimized for conversational data
 - 🔍 Semantic search using OpenAI embeddings
 - 💬 Two interfaces: Interactive CLI and REST API
+- ⚡ **Real-time streaming responses** for better UX
 - 📦 Smart file caching to avoid reprocessing
 - 🔐 Comprehensive logging for debugging and monitoring
-- ✅ Full test coverage with pytest
 
 ## 🏗️ Architecture
 
@@ -179,8 +179,22 @@ pip install -r requirements.txt
 
 4. **Configure OpenAI API Key**
 
-Create a `.env` file in the project root:
+Copy the example environment file and add your API key:
 
+```bash
+# Copy the example file
+cp .env.example .env
+
+# Edit .env and add your OpenAI API key
+# OPENAI_API_KEY=your_actual_key_here
+```
+
+**Minimum required configuration:**
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+**All available options** (see `.env.example` for details):
 ```env
 # Required
 OPENAI_API_KEY=your_openai_api_key_here
@@ -206,12 +220,7 @@ MAX_FILE_SIZE_MB=10
 MAX_FILES_PER_UPLOAD=5
 ```
 
-5. **Download ICSI Corpus**
-
-Download MRT files from [ICSI Corpus](https://groups.inf.ed.ac.uk/ami/icsi/download/) and place them in:
-```
-data/transcripts/
-```
+That's it! You're ready to use the chatbot. You can upload MRT files from the [ICSI Corpus](https://groups.inf.ed.ac.uk/ami/icsi/download/) directly through the CLI or API when you start chatting.
 
 ## 🎮 Usage
 
@@ -263,7 +272,7 @@ The API will be available at `http://localhost:8000`
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/upload` | POST | Upload MRT files |
-| `/chat` | POST | Send chat message |
+| `/chat` | POST | **Send chat message (streaming)** |
 | `/files` | GET | List uploaded files |
 | `/files` | DELETE | Clear all files |
 
@@ -273,10 +282,11 @@ The API will be available at `http://localhost:8000`
 curl -X POST "http://localhost:8000/upload" \
   -F "files=@data/transcripts/Bmr001.mrt"
 
-# Chat
+# Chat (streaming response)
 curl -X POST "http://localhost:8000/chat" \
   -H "Content-Type: application/json" \
   -d '{"message": "What was discussed in the meeting?"}'
+# Response streams in real-time as plain text
 
 # List files
 curl "http://localhost:8000/files"
@@ -287,14 +297,14 @@ Visit `http://localhost:8000/docs` for interactive Swagger UI documentation.
 
 ## 🧪 Testing
 
-The project includes comprehensive test coverage:
+The project includes comprehensive test coverage **(75%+)**:
 
 ```bash
 # Run all tests
 pytest
 
 # Run with coverage report
-pytest --cov=src --cov-report=html
+pytest --cov=src --cov-report=html --cov-report=term
 
 # Run specific test file
 pytest tests/test_ingestion.py -v
@@ -308,8 +318,17 @@ pytest -v --tb=short
 tests/
 ├── test_ingestion.py      # MRT parsing and indexing tests
 ├── test_chat_engine.py    # Chat engine functionality tests
-└── test_api.py            # API endpoint tests
+├── test_api.py            # API endpoint tests (including streaming)
+├── test_cli.py            # CLI client tests
+└── test_file_processor.py # File processing and validation tests
 ```
+
+**Coverage Highlights:**
+- **API**: Upload, chat streaming, file management
+- **CLI**: All commands and error handling
+- **File Processing**: Validation, parsing, edge cases
+- **Chat Engine**: Streaming, memory, queries
+- **Ingestion**: MRT parsing, text cleaning, chunking
 
 ## 📊 Configuration Options
 
@@ -351,7 +370,13 @@ natter-icsi-chatbot/
 │   └── logger.py            # Logging setup
 ├── storage/                 # Vector index storage
 ├── tests/                   # Test suite
-├── .env                     # Environment variables (create this)
+│   ├── test_api.py          # API tests
+│   ├── test_chat_engine.py  # Chat engine tests
+│   ├── test_cli.py          # CLI tests
+│   ├── test_file_processor.py # File processor tests
+│   └── test_ingestion.py    # Ingestion tests
+├── .env.example             # Example environment variables
+├── .env                     # Your environment variables (create this)
 ├── main.py                  # Entry point
 ├── requirements.txt         # Dependencies
 └── README.md               # This file
@@ -390,11 +415,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **ICSI Meeting Corpus**: [https://groups.inf.ed.ac.uk/ami/icsi/](https://groups.inf.ed.ac.uk/ami/icsi/)
 - **LlamaIndex**: For the powerful RAG framework
 - **OpenAI**: For embeddings and language models
-
-## � Support
-
-For issues, questions, or contributions, please open an issue on GitHub.
-
----
-
-**Built with ❤️ for meeting analysis and conversation understanding**
