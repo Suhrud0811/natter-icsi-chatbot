@@ -8,6 +8,8 @@ import hashlib
 from typing import Dict, List, Optional
 from llama_index.core import Document
 
+from src.logger import logger
+
 
 class FileCache:
     """Smart cache for processed document files.
@@ -18,6 +20,7 @@ class FileCache:
     
     def __init__(self):
         """Initialize an empty cache."""
+        logger.debug("Initializing FileCache")
         # Map: content_hash -> Document
         self._documents_by_hash: Dict[str, Document] = {}
         
@@ -57,8 +60,10 @@ class FileCache:
             filename: Original filename (for display purposes)
             document: Parsed LlamaIndex Document
         """
+        logger.debug(f"Adding to cache: {filename} (hash: {content_hash[:8]}...)")
         self._documents_by_hash[content_hash] = document
         self._hash_by_filename[filename] = content_hash
+        logger.info(f"Cached document: {filename} (total: {len(self._documents_by_hash)})")
     
     def get(self, content_hash: str) -> Optional[Document]:
         """Retrieve a cached document by its content hash.
@@ -69,7 +74,12 @@ class FileCache:
         Returns:
             Cached Document if found, None otherwise
         """
-        return self._documents_by_hash.get(content_hash)
+        doc = self._documents_by_hash.get(content_hash)
+        if doc:
+            logger.debug(f"Cache hit for hash: {content_hash[:8]}...")
+        else:
+            logger.debug(f"Cache miss for hash: {content_hash[:8]}...")
+        return doc
     
     def get_all_documents(self) -> List[Document]:
         """Get all cached documents for indexing.
@@ -89,8 +99,11 @@ class FileCache:
     
     def clear(self) -> None:
         """Remove all cached documents and start fresh."""
+        count = len(self._documents_by_hash)
+        logger.info(f"Clearing cache ({count} document(s))")
         self._documents_by_hash.clear()
         self._hash_by_filename.clear()
+        logger.debug("Cache cleared successfully")
     
     def size(self) -> int:
         """Get the number of unique documents in cache.

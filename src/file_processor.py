@@ -8,6 +8,7 @@ from pathlib import Path
 from llama_index.core import Document
 
 from src.ingestion import parse_mrt_file
+from src.logger import logger
 
 
 class FileProcessor:
@@ -27,10 +28,12 @@ class FileProcessor:
         Raises:
             ValueError: If file is not an .mrt file or parsing fails
         """
+        logger.debug(f"Processing file: {filename} ({len(content)} bytes)")
         file_extension = Path(filename).suffix.lower()
         
         # Only accept .mrt files
         if file_extension != '.mrt':
+            logger.warning(f"Rejected file with invalid extension: {filename} ({file_extension})")
             raise ValueError(
                 f"Cannot process '{file_extension}' files. "
                 f"Only .mrt (Meeting Room Transcript) files are supported."
@@ -44,9 +47,11 @@ class FileProcessor:
         
         try:
             # Parse the MRT XML file using existing parser
+            logger.debug(f"Parsing MRT file: {filename}")
             parsed_document = parse_mrt_file(temp_file_path)
             
             if parsed_document is None:
+                logger.error(f"Failed to parse MRT file: {filename}")
                 raise ValueError(
                     f"Failed to parse '{filename}'. "
                     f"The file may be corrupted or not a valid MRT file."
@@ -54,9 +59,13 @@ class FileProcessor:
             
             # Add the original filename to metadata for tracking
             parsed_document.metadata['uploaded_filename'] = filename
+            logger.info(f"Successfully processed file: {filename}")
             
             return parsed_document
             
+        except Exception as e:
+            logger.error(f"Error processing file {filename}: {str(e)}", exc_info=True)
+            raise
         finally:
             # Always clean up the temporary file
             temp_file_path.unlink(missing_ok=True)
@@ -76,10 +85,12 @@ class FileProcessor:
         file_size_mb = len(content) / (1024 * 1024)
         
         if file_size_mb > max_size_mb:
+            logger.warning(f"File size validation failed: {file_size_mb:.2f}MB > {max_size_mb}MB")
             raise ValueError(
                 f"File is too large ({file_size_mb:.2f}MB). "
                 f"Maximum allowed size is {max_size_mb}MB."
             )
+        logger.debug(f"File size validation passed: {file_size_mb:.2f}MB")
     
     @staticmethod
     def validate_file_type(filename: str, allowed_extensions: list) -> None:
@@ -96,9 +107,11 @@ class FileProcessor:
         
         if file_extension not in allowed_extensions:
             allowed_types_display = ', '.join(allowed_extensions)
+            logger.warning(f"File type validation failed: {filename} ({file_extension})")
             raise ValueError(
                 f"'{file_extension}' files are not allowed. "
                 f"Allowed file types: {allowed_types_display}"
             )
+        logger.debug(f"File type validation passed: {filename}")
 
 

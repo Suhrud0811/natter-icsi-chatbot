@@ -11,6 +11,7 @@ from src.ingestion import load_or_create_index, create_index
 from src.chat_engine import ChatEngine
 from src.file_cache import FileCache
 from src.file_processor import FileProcessor
+from src.logger import logger
 
 
 # Global state for the chat engine and file cache
@@ -54,23 +55,24 @@ async def lifespan(app: FastAPI):
     """Initialize resources on startup."""
     global _chat_engine, _file_cache, _current_files
     
-    print("Starting Chatbot API...")
+    logger.info("Starting Chatbot API...")
     validate_config()
     
     # Ensure required directories exist
     from src.config import ensure_directories
     ensure_directories()
+    logger.info("Required directories created/verified")
     
     # Initialize file cache
     _file_cache = FileCache()
     _current_files = []
     _chat_engine = None
     
-    print("API ready - upload files to start chatting")
+    logger.info("API ready - upload files to start chatting")
     yield
     
     # Cleanup
-    print("Shutting down...")
+    logger.info("Shutting down API...")
 
 
 app = FastAPI(
@@ -102,8 +104,11 @@ async def upload_files(files: List[UploadFile] = File(...)):
     """
     global _chat_engine, _file_cache, _current_files
     
+    logger.info(f"Upload request received: {len(files)} file(s)")
+    
     # Validate number of files
     if len(files) > MAX_FILES_PER_UPLOAD:
+        logger.warning(f"Too many files uploaded: {len(files)} > {MAX_FILES_PER_UPLOAD}")
         raise HTTPException(
             status_code=400,
             detail=f"Too many files. Maximum: {MAX_FILES_PER_UPLOAD}"
@@ -128,10 +133,12 @@ async def upload_files(files: List[UploadFile] = File(...)):
             file_hash = _file_cache.get_file_hash(content)
             
             if _file_cache.is_cached(file_hash):
+                logger.debug(f"File already cached: {file.filename}")
                 cached.append(file.filename)
                 continue
             
             # Process new file
+            logger.info(f"Processing new file: {file.filename}")
             document = FileProcessor.process_file(file.filename, content)
             _file_cache.add(file_hash, file.filename, document)
             processed.append(file.filename)
@@ -154,9 +161,12 @@ async def upload_files(files: List[UploadFile] = File(...)):
     all_docs = _file_cache.get_all_documents()
     if all_docs:
         try:
+            logger.info(f"Creating vector index with {len(all_docs)} document(s)")
             index = create_index(all_docs, persist=False)
             _chat_engine = ChatEngine(index)
+            logger.info("Chat engine initialized successfully")
         except Exception as e:
+            logger.error(f"Error creating index: {str(e)}", exc_info=True)
             raise HTTPException(
                 status_code=500,
                 detail=f"Error creating index: {str(e)}"
@@ -176,7 +186,10 @@ async def chat(request: ChatRequest):
     
     Send a message and receive a response based on uploaded files.
     """
+    logger.info(f"Chat request: {request.message[:50]}...")
+    
     if _chat_engine is None:
+        logger.warning("Chat request rejected: no files uploaded")
         raise HTTPException(
             status_code=503,
             detail="No files uploaded. Please upload files first using /upload endpoint.",
@@ -191,8 +204,10 @@ async def chat(request: ChatRequest):
     try:
         # Use query for stateless API calls
         response = _chat_engine.query(request.message)
+        logger.info("Chat response generated successfully")
         return ChatResponse(response=response)
     except Exception as e:
+        logger.error(f"Error processing chat request: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Error processing request: {str(e)}",

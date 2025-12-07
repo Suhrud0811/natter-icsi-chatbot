@@ -14,6 +14,7 @@ from src.config import (
     CHAT_MEMORY_TOKEN_LIMIT,
     load_prompt,
 )
+from src.logger import logger
 
 
 class ChatEngine:
@@ -25,20 +26,24 @@ class ChatEngine:
         Args:
             index: VectorStoreIndex built from ICSI transcripts
         """
+        logger.info("Initializing ChatEngine...")
         self.index = index
         self.llm = OpenAI(
             model=OPENAI_MODEL,
             api_key=OPENAI_API_KEY,
         )
+        logger.debug(f"Using OpenAI model: {OPENAI_MODEL}")
         
         # Load system prompt (lazy loading to avoid issues during import)
         system_prompt = load_prompt("system_prompts")
         
         # Create retriever
         self.retriever = index.as_retriever(similarity_top_k=SIMILARITY_TOP_K)
+        logger.debug(f"Retriever configured with top_k={SIMILARITY_TOP_K}")
         
         # Create chat memory for conversation context
         self.memory = ChatMemoryBuffer.from_defaults(token_limit=CHAT_MEMORY_TOKEN_LIMIT)
+        logger.debug(f"Chat memory initialized with token_limit={CHAT_MEMORY_TOKEN_LIMIT}")
         
         # Create chat engine
         self._engine = ContextChatEngine.from_defaults(
@@ -47,6 +52,7 @@ class ChatEngine:
             memory=self.memory,
             system_prompt=system_prompt,
         )
+        logger.info("ChatEngine initialized successfully")
     
     def chat(self, message: str) -> str:
         """Send a message and get a response.
@@ -57,11 +63,18 @@ class ChatEngine:
         Returns:
             Assistant's response based on retrieved context
         """
-        response = self._engine.chat(message)
-        return str(response)
+        logger.debug(f"Processing chat message: {message[:100]}...")
+        try:
+            response = self._engine.chat(message)
+            logger.debug("Chat response generated successfully")
+            return str(response)
+        except Exception as e:
+            logger.error(f"Error in chat: {str(e)}", exc_info=True)
+            raise
     
     def reset(self) -> None:
         """Reset conversation memory."""
+        logger.info("Resetting chat memory")
         self._engine.reset()
     
     def query(self, question: str) -> str:
@@ -75,12 +88,18 @@ class ChatEngine:
         Returns:
             Response based on retrieved context
         """
-        query_engine = self.index.as_query_engine(
-            llm=self.llm,
-            similarity_top_k=SIMILARITY_TOP_K,
-        )
-        response = query_engine.query(question)
-        return str(response)
+        logger.debug(f"Processing query: {question[:100]}...")
+        try:
+            query_engine = self.index.as_query_engine(
+                llm=self.llm,
+                similarity_top_k=SIMILARITY_TOP_K,
+            )
+            response = query_engine.query(question)
+            logger.debug("Query response generated successfully")
+            return str(response)
+        except Exception as e:
+            logger.error(f"Error in query: {str(e)}", exc_info=True)
+            raise
 
 
 def create_chat_engine(index: VectorStoreIndex) -> ChatEngine:

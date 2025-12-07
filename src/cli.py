@@ -7,6 +7,7 @@ import requests
 from requests.exceptions import RequestException, ConnectionError, Timeout
 
 from src.config import validate_config, CLI_API_URL, CLI_API_TIMEOUT
+from src.logger import logger
 
 
 def check_api_health() -> bool:
@@ -105,6 +106,7 @@ def clear_files() -> dict:
 
 def run_cli():
     """Run the interactive CLI chatbot (thin client)."""
+    logger.info("Starting CLI chatbot")
     print("=" * 60)
     print("Meeting Transcript Chatbot (API Client)")
     print("=" * 60)
@@ -116,12 +118,14 @@ def run_cli():
         from src.config import ensure_directories
         ensure_directories()
     except ValueError as e:
+        logger.error(f"Configuration validation failed: {e}")
         print(f"Configuration error: {e}")
         sys.exit(1)
     
     # Check API server health
     print(f"Connecting to API server at {CLI_API_URL}...")
     if not check_api_health():
+        logger.error(f"Cannot connect to API server at {CLI_API_URL}")
         print()
         print(" Error: API server is not running or not accessible!")
         print()
@@ -174,6 +178,7 @@ def run_cli():
                 
                 try:
                     print(f"Uploading '{file_path.name}'...")
+                    logger.info(f"Uploading file via CLI: {file_path}")
                     result = upload_file(file_path)
                     
                     # Display results
@@ -184,8 +189,10 @@ def run_cli():
                     
                     print(f"Total files in system: {result['total_files']}")
                     print(f"Status: {result['status']}\n")
+                    logger.debug(f"Upload successful: {result}")
                     
                 except RequestException as e:
+                    logger.error(f"Upload failed: {e}", exc_info=True)
                     print(f"Error uploading file: {e}\n")
                 continue
             
@@ -218,14 +225,17 @@ def run_cli():
             
             # Handle chat (default)
             try:
+                logger.debug(f"Sending chat message: {user_input[:50]}...")
                 print("\nAssistant: ", end="", flush=True)
                 response = send_chat_message(user_input)
                 print(response)
                 print()
                 
-            except ConnectionError:
+            except ConnectionError as e:
+                logger.error(f"Connection error: {e}")
                 print("\n Error: Lost connection to API server\n")
-            except Timeout:
+            except Timeout as e:
+                logger.error(f"Timeout error: {e}")
                 print("\n Error: Request timed out\n")
             except RequestException as e:
                 # Check if it's a "no files uploaded" error
@@ -233,18 +243,24 @@ def run_cli():
                     if e.response.status_code == 503:
                         error_detail = e.response.json().get('detail', '')
                         if 'No files uploaded' in error_detail:
+                            logger.warning("Chat attempted with no files uploaded")
                             print("\nPlease upload a file first using: upload <file.mrt>\n")
                         else:
+                            logger.error(f"API error (503): {error_detail}")
                             print(f"\n Error: {error_detail}\n")
                     else:
+                        logger.error(f"API error ({e.response.status_code}): {e}")
                         print(f"\n Error: {e}\n")
                 else:
+                    logger.error(f"Request error: {e}", exc_info=True)
                     print(f"\n Error: {e}\n")
             
         except KeyboardInterrupt:
+            logger.info("CLI interrupted by user")
             print("\n\nGoodbye!")
             break
         except Exception as e:
+            logger.error(f"Unexpected error in CLI: {e}", exc_info=True)
             print(f"\n Unexpected error: {e}\n")
 
 

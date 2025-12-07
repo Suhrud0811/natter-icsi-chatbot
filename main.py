@@ -2,6 +2,7 @@
 import sys
 import argparse
 from src.config import API_HOST, API_PORT
+from src.logger import logger
 def main():
     parser = argparse.ArgumentParser(
         description="ICSI Meeting Corpus Chatbot",
@@ -41,10 +42,12 @@ Examples:
     args = parser.parse_args()
     
     if args.command == "cli":
+        logger.info("Starting ICSI Chatbot in CLI mode")
         from src.cli import run_cli
         run_cli()
     
     elif args.command == "api":
+        logger.info(f"Starting ICSI Chatbot API server on {args.host}:{args.port}")
         import uvicorn
         uvicorn.run(
             "src.api:app",
@@ -54,6 +57,7 @@ Examples:
         )
     
     else:
+        logger.warning("No command specified")
         parser.print_help()
         sys.exit(1)
 if __name__ == "__main__":
