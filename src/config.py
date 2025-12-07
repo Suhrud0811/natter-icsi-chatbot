@@ -35,6 +35,25 @@ API_PORT = int(os.getenv("API_PORT", "8000"))
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
 MAX_FILES_PER_UPLOAD = int(os.getenv("MAX_FILES_PER_UPLOAD", "5"))
 ALLOWED_FILE_TYPES = os.getenv("ALLOWED_FILE_TYPES", ".mrt").split(",")
+
+# CLI API connection settings
+CLI_API_URL = os.getenv("CLI_API_URL", "http://localhost:8000")
+CLI_API_TIMEOUT = int(os.getenv("CLI_API_TIMEOUT", "30"))
+
+
+def ensure_directories() -> None:
+    """Create required directories if they don't exist.
+    
+    Creates:
+    - data/transcripts/ - For storing MRT transcript files
+    - storage/ - For persisting vector index
+    - prompts/ - For system prompts (should already exist)
+    """
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+    PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def validate_config() -> None:
     """Validate required configuration."""
     if not OPENAI_API_KEY:
