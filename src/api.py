@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from src.config import validate_config, MAX_FILE_SIZE_MB, MAX_FILES_PER_UPLOAD, ALLOWED_FILE_TYPES
@@ -180,11 +181,12 @@ async def upload_files(files: List[UploadFile] = File(...)):
     )
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat")
 async def chat(request: ChatRequest):
-    """Chat endpoint for querying uploaded documents.
+    """Chat endpoint with streaming support.
     
-    Send a message and receive a response based on uploaded files.
+    Send a message and receive a streaming response based on uploaded files.
+    Tokens are streamed as they're generated for better UX.
     """
     logger.info(f"Chat request: {request.message[:50]}...")
     
@@ -202,10 +204,17 @@ async def chat(request: ChatRequest):
         )
     
     try:
-        # Use query for stateless API calls
-        response = _chat_engine.query(request.message)
-        logger.info("Chat response generated successfully")
-        return ChatResponse(response=response)
+        def generate():
+            """Generator function for streaming response."""
+            try:
+                for token in _chat_engine.chat_stream(request.message):
+                    yield token
+                logger.info("Streaming chat response completed")
+            except Exception as e:
+                logger.error(f"Error during streaming: {str(e)}", exc_info=True)
+                yield f"\n\nError: {str(e)}"
+        
+        return StreamingResponse(generate(), media_type="text/plain")
     except Exception as e:
         logger.error(f"Error processing chat request: {str(e)}", exc_info=True)
         raise HTTPException(

@@ -72,6 +72,25 @@ class ChatEngine:
             logger.error(f"Error in chat: {str(e)}", exc_info=True)
             raise
     
+    def chat_stream(self, message: str):
+        """Stream chat response token by token.
+        
+        Args:
+            message: User's question or message
+            
+        Yields:
+            Response tokens as they're generated
+        """
+        logger.debug(f"Processing streaming chat message: {message[:100]}...")
+        try:
+            streaming_response = self._engine.stream_chat(message)
+            for token in streaming_response.response_gen:
+                yield token
+            logger.debug("Streaming chat response completed")
+        except Exception as e:
+            logger.error(f"Error in streaming chat: {str(e)}", exc_info=True)
+            raise
+    
     def reset(self) -> None:
         """Reset conversation memory."""
         logger.info("Resetting chat memory")

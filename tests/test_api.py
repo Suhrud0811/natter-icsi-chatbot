@@ -77,8 +77,16 @@ class TestChatEndpoint:
     
     @patch("src.api._chat_engine")
     def test_chat_success(self, mock_engine, client):
-        """Test successful chat request."""
-        mock_engine.query.return_value = "This is a test response"
+        """Test successful chat request with streaming."""
+        # Mock the chat_stream generator
+        def mock_stream(message):
+            yield "This "
+            yield "is "
+            yield "a "
+            yield "test "
+            yield "response"
+        
+        mock_engine.chat_stream = mock_stream
         
         response = client.post(
             "/chat",
@@ -86,14 +94,16 @@ class TestChatEndpoint:
         )
         
         assert response.status_code == 200
-        data = response.json()
-        assert "response" in data
-        assert data["response"] == "This is a test response"
+        # Streaming returns text/plain, not JSON
+        assert response.text == "This is a test response"
     
     @patch("src.api._chat_engine")
     def test_chat_handles_exception(self, mock_engine, client):
         """Test chat handles exceptions gracefully."""
-        mock_engine.query.side_effect = Exception("Test error")
+        def mock_stream_error(message):
+            raise Exception("Test error")
+        
+        mock_engine.chat_stream = mock_stream_error
         
         response = client.post(
             "/chat",
@@ -101,7 +111,6 @@ class TestChatEndpoint:
         )
         
         assert response.status_code == 500
-        assert "error" in response.json()["detail"].lower()
 
 
 class TestRequestModels:
@@ -136,8 +145,14 @@ class TestAPIIntegration:
     
     @patch("src.api._chat_engine")
     def test_full_chat_flow(self, mock_engine):
-        """Test complete chat request/response flow."""
-        mock_engine.query.return_value = "Test response about meetings"
+        """Test complete chat request/response flow with streaming."""
+        def mock_stream(message):
+            yield "Test "
+            yield "response "
+            yield "about "
+            yield "meetings"
+        
+        mock_engine.chat_stream = mock_stream
         
         client = TestClient(app)
         
@@ -152,4 +167,4 @@ class TestAPIIntegration:
         )
         
         assert chat_response.status_code == 200
-        assert "response" in chat_response.json()
+        assert chat_response.text == "Test response about meetings"

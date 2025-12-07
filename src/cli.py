@@ -49,14 +49,11 @@ def upload_file(file_path: Path) -> dict:
         return response.json()
 
 
-def send_chat_message(message: str) -> str:
-    """Send a chat message to the API.
+def send_chat_message(message: str) -> None:
+    """Send a chat message to the API and stream the response.
     
     Args:
         message: User's message
-        
-    Returns:
-        AI response text
         
     Raises:
         RequestException: If chat request fails
@@ -64,10 +61,15 @@ def send_chat_message(message: str) -> str:
     response = requests.post(
         f"{CLI_API_URL}/chat",
         json={"message": message},
-        timeout=CLI_API_TIMEOUT
+        timeout=CLI_API_TIMEOUT,
+        stream=True
     )
     response.raise_for_status()
-    return response.json()["response"]
+    
+    # Stream the response token by token
+    for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+        if chunk:
+            print(chunk, end="", flush=True)
 
 
 def list_files() -> dict:
@@ -138,6 +140,10 @@ def run_cli():
     
     print("✓ Connected to API server")
     print()
+    print("👋 Welcome! I'm your ICSI Meeting Transcript Assistant.")
+    print("I can help you explore and analyze meeting conversations.")
+    print("Upload some transcripts to get started!")
+    print()
     print("Commands:")
     print("  upload <file.mrt>     - Upload a meeting transcript file")
     print("  files                 - List uploaded files")
@@ -177,7 +183,7 @@ def run_cli():
                     continue
                 
                 try:
-                    print(f"Uploading '{file_path.name}'...")
+                    print(f"Analyzing '{file_path.name}'...")
                     logger.info(f"Uploading file via CLI: {file_path}")
                     result = upload_file(file_path)
                     
@@ -227,8 +233,8 @@ def run_cli():
             try:
                 logger.debug(f"Sending chat message: {user_input[:50]}...")
                 print("\nAssistant: ", end="", flush=True)
-                response = send_chat_message(user_input)
-                print(response)
+                send_chat_message(user_input)
+                print()  # New line after streaming completes
                 print()
                 
             except ConnectionError as e:
